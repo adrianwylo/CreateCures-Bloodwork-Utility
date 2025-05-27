@@ -1,0 +1,13 @@
+{
+    "name": "Bloodwork Processor",
+    "description": "Utility for processing bloodwork data into csv format.",
+    "version": "1.0",
+    "manifest_version": 3,
+    "action": {
+      "default_popup": "popup.html",
+      "default_icon": "assets/default_icon.png"
+    },
+    "permissions": [
+        "storage"
+    ]
+}
