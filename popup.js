@@ -1,4 +1,4 @@
-import {processImages} from '.logic/imageProcessor.js'
+import {processImages, processTestImages} from '.logic/imageProcessor.js'
 
 document.getElementById('process-btn').addEventListener('click', async () => {
     const files = document.getElementById('bloodwork-files').files;
@@ -33,4 +33,27 @@ document.getElementById('process-btn').addEventListener('click', async () => {
     a.href = url
     a.download = 'output.csv';
     a.click();
+    
+    URL.revokeObjectURL(url);
+});
+
+document.getElementById('process-btn-test').addEventListener('click', async () => {
+    const final_data = await processTestImages()
+    // Convert your JavaScript object or array to a JSON string
+    const json = JSON.stringify(final_data, null, 2); // Pretty print with 2-space indentation
+
+    // Create a Blob from the JSON string
+    const blob = new Blob([json], { type: 'application/json' });
+
+    // Create a temporary download URL
+    const url = URL.createObjectURL(blob);
+
+    // Create an anchor element to trigger download
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'output.json';
+    a.click();
+
+    // Clean up the URL object to free memory
+    URL.revokeObjectURL(url);
 });
