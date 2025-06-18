@@ -33,6 +33,7 @@ export async function processTestImages(files) {
         })
         .then(out => {
             console.log(out) //for debugging
+            const wordsArray = [];
             if (out.data?.blocks) {
                 console.log("blocks have been ensured")
                 out.data.blocks.forEach((block, blockIdx) => {
@@ -58,6 +59,7 @@ export async function processTestImages(files) {
             }
             return {
                 imageName: file.webkitRelativePath || file.name,
+                rotateRadians: out.data.rotateRadians,
                 words: wordsArray
             };
         })

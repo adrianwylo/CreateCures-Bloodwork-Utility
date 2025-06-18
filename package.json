@@ -1,7 +1,8 @@
 {
   "dependencies": {
-    "tesseract.js": "^6.0.1",
-    "canvas": "^2.11.2"
+    "canvas": "^2.11.2",
+    "pdfjs-dist": "^5.3.31",
+    "tesseract.js": "^6.0.1"
   },
   "name": "createcures-bloodwork-utility",
   "version": "1.0.0",
