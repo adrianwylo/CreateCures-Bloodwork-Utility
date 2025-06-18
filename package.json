@@ -1,5 +1,25 @@
 {
   "dependencies": {
-    "tesseract.js": "^6.0.1"
-  }
+    "tesseract.js": "^6.0.1",
+    "canvas": "^2.11.2"
+  },
+  "name": "createcures-bloodwork-utility",
+  "version": "1.0.0",
+  "description": "Lightweight Util for translating Patient info into Google sheets for CreateCure Foundation Dieticians\r Uses tesseract.js",
+  "main": "dist/popup.bundle.js",
+  "devDependencies": {
+    "@babel/core": "^7.27.4",
+    "@babel/preset-env": "^7.27.2",
+    "babel-loader": "^10.0.0",
+    "copy-webpack-plugin": "^13.0.0",
+    "webpack": "^5.99.9",
+    "webpack-cli": "^6.0.1"
+  },
+  "scripts": {
+    "build": "webpack",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
 }
