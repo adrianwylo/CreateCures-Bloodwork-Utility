@@ -83,6 +83,142 @@ const Default_Row_Format = {
     Vitamin_D_RangeHigh: 90
 };
 
+const field_names = {
+    // Liver Function Tests
+    AST: [
+        'ast', 'aspartate aminotransferase', 'aspartate transaminase', 'sgot', 
+        'serum glutamic oxaloacetic transaminase', 'asp aminotransferase'
+    ],
+    
+    ALT: [
+        'alt', 'alanine aminotransferase', 'alanine transaminase', 'sgpt', 
+        'serum glutamic pyruvic transaminase', 'ala aminotransferase', 'alat'
+    ],
+    
+    // Protein Tests
+    GLOBULIN: [
+        'globulin', 'serum globulin', 'total globulin', 'glob', 'globulins'
+    ],
+    
+    // Kidney Function
+    BUN: [
+        'bun', 'blood urea nitrogen', 'urea nitrogen', 'urea', 'blood urea'
+    ],
+    
+    // Diabetes/Glucose Tests
+    FASTING_GLUCOSE: [
+        'fasting glucose', 'glucose fasting', 'fbs', 'fasting blood sugar', 
+        'glucose', 'blood glucose', 'serum glucose', 'plasma glucose',
+        'gluc', 'glu', 'fast glucose', 'glucose fast'
+    ],
+    
+    A1C: [
+        'a1c', 'hba1c', 'hemoglobin a1c', 'glycated hemoglobin', 'glycohemoglobin',
+        'hgb a1c', 'hb a1c', 'a1c hemoglobin', 'hemoglobin a1c'
+    ],
+    
+    // Complete Blood Count
+    RBC: [
+        'rbc', 'red blood cells', 'red blood cell count', 'erythrocytes', 
+        'red cell count', 'rbc count', 'red cells'
+    ],
+    
+    HGB: [
+        'hgb', 'hemoglobin', 'hb', 'haemoglobin', 'hemo'
+    ],
+    
+    HCT: [
+        'hct', 'hematocrit', 'haematocrit', 'packed cell volume', 'pcv'
+    ],
+    
+    WBC: [
+        'wbc', 'white blood cells', 'white blood cell count', 'leukocytes', 
+        'white cell count', 'wbc count', 'white cells', 'leucocytes'
+    ],
+    
+    PLATELETS: [
+        'platelets', 'platelet count', 'plt', 'thrombocytes', 'plts'
+    ],
+    
+    // Electrolytes
+    SODIUM: [
+        'sodium', 'na', 'serum sodium', 'na+', 'sod'
+    ],
+    
+    POTASSIUM: [
+        'potassium', 'k', 'serum potassium', 'k+', 'pot'
+    ],
+    
+    CHLORIDE: [
+        'chloride', 'cl', 'serum chloride', 'cl-', 'chlor'
+    ],
+    
+    CALCIUM: [
+        'calcium', 'ca', 'serum calcium', 'ca++', 'total calcium', 'ca2+'
+    ],
+    
+    CO2: [
+        'co2', 'carbon dioxide', 'bicarbonate', 'hco3', 'total co2', 
+        'co2 total', 'bicarb', 'tco2'
+    ],
+    
+    // Hormones
+    IGF1: [
+        'igf1', 'igf-1', 'insulin-like growth factor 1', 'insulin like growth factor',
+        'somatomedin c', 'igf 1'
+    ],
+    
+    FASTING_INSULIN: [
+        'fasting insulin', 'insulin fasting', 'insulin', 'serum insulin',
+        'plasma insulin', 'fast insulin', 'insulin fast'
+    ],
+    
+    // Ketones
+    BETA_HYDROXYBUTYRATE: [
+        'beta hydroxybutyrate', 'beta-hydroxybutyrate', 'b-hydroxybutyrate',
+        'bhb', 'ketones', 'serum ketones', 'beta hydroxy butyrate'
+    ],
+    
+    // Vitamins
+    B12: [
+        'b12', 'vitamin b12', 'vitamin b-12', 'cobalamin', 'cyanocobalamin',
+        'b 12', 'vit b12', 'folate b12'
+    ],
+    
+    Vitamin_D: [
+        'vitamin d', 'vitamin d3', 'vitamin d 25-oh', '25-hydroxyvitamin d',
+        '25 oh vitamin d', 'calcidiol', 'vit d', 'vitamin d total',
+        '25-oh-d3', '25(oh)d', 'vitamin d 25 hydroxy'
+    ],
+    
+    // Minerals
+    MAGNESIUM: [
+        'magnesium', 'mg', 'serum magnesium', 'mg++', 'mag'
+    ],
+    
+    IRON: [
+        'iron', 'fe', 'serum iron', 'iron serum', 'total iron'
+    ],
+    
+    // Inflammatory Markers
+    CRP: [
+        'crp', 'c-reactive protein', 'c reactive protein', 'c-rp', 
+        'high sensitivity crp', 'hs-crp', 'hs crp'
+    ],
+    
+    // Lipids
+    CHOLESTEROL: [
+        'cholesterol', 'total cholesterol', 'chol', 'tc', 'serum cholesterol',
+        'total chol'
+    ],
+    
+    // Cardiovascular
+    HOMOCYSTEINE: [
+        'homocysteine', 'hcy', 'homo-cysteine', 'homocyst', 'total homocysteine'
+    ],
+    
+};
+
 //placeholder for persistent curRowFormat
 let curRowFormat = { ...Default_Row_Format };
 
@@ -107,9 +243,7 @@ export async function modifyRowFormat(field, rangeValue, newValue) {
     }
 }
 
-
-
-//return a row based on current row format
-export async function createRow(rowInfo) {
-    //Return row based on read pdf input
+//
+export async function processJsonToCSV(json_input) {
+    
 }

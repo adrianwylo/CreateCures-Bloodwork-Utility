@@ -1,6 +1,6 @@
 import {processTestImages} from './imageProcessor.js'
 import {filterInputFiles} from './imageCleaner.js'
-import {convertToCSV} from './formatCsvRow.js'
+import {processJsonToCSV} from './formatCsvRow.js'
 
 document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('process-btn-test').addEventListener('click', async () => {
@@ -15,7 +15,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // Convert your JavaScript object or array to a JSON string
         const json = JSON.stringify(final_data, null, 2); // Pretty print with 2-space indentation
 
-        const csv = convertToCSV(json);
+        const csv = processJsonToCSV(json);
 
         // Create a Blob from the JSON string
         const blob = new Blob([csv], { type: 'application/csv' });
