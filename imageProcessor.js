@@ -1,8 +1,6 @@
 import {createScheduler, addWorker, createWorker, PSM} from 'tesseract.js';
 
-export async function processTestImages(files) {
-    console.log('Number of image files found:', files.length);
-    
+export async function processTestImages(files) {    
     // Create a scheduler and workers
     const workerN = 7;
     const scheduler = createScheduler();
