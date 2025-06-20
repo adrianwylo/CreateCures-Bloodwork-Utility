@@ -219,6 +219,11 @@ const field_names = {
     
 };
 
+
+
+
+
+
 //placeholder for persistent curRowFormat
 let curRowFormat = { ...Default_Row_Format };
 
@@ -243,7 +248,172 @@ export async function modifyRowFormat(field, rangeValue, newValue) {
     }
 }
 
-//
+
+// Evaluates how close a given value is to an expected string using fuzzy matching.
+// Returns a confidence score between 0 and 1, where 1 means an exact match
+// ocr_word: an object containing the OCR word text and other information
+// expected_key: the expected key string to match against
+async function evalKeyConfidence(ocr_word, expected_key) {
+    //placeholder for fuzzy matching logic
+    return 1; // Replace with actual fuzzy matching logic
+}
+
+// Evaluates how confident ocr_word is a number
+// Returns a confidence score between 0 and 1, where 1 means an exact match
+async function evalValueConfidence(ocr_word, expected_value) {
+    //placeholder for fuzzy matching logic
+    return 1; // Replace with actual fuzzy matching logic
+}
+
+
+// Evaluates how confident a key-value pair is correct
+// Returns a confidence score between 0 and 1, where 1 means an exact match
+async function evaleKeyValueConfidence(ocr_key,ocr_value) {
+    //Evaluate vertical alignment of key and value
+    //Evaluate horizontal alignment of key and value
+    //Evaluate distance between key and value
+}
+
+
+
+//  Processes the input JSON data to extract relevant fields and format them into a CSV row.
+//  Returns an array of objects, each representing a row in the CSV format.
 export async function processJsonToCSV(json_input) {
-    
+    // evaluate input JSON and rank relevant keys
+    const probable_keys = {
+        // Liver Function Tests
+        AST: [],
+        
+        ALT: [],
+        
+        // Protein Tests
+        GLOBULIN: [],
+        
+        // Kidney Function
+        BUN: [],
+        
+        // Diabetes/Glucose Tests
+        FASTING_GLUCOSE: [],
+        
+        A1C: [],
+        
+        // Complete Blood Count
+        RBC: [],
+        
+        HGB: [],
+        
+        HCT: [],
+        
+        WBC: [],
+        
+        PLATELETS: [],
+        
+        // Electrolytes
+        SODIUM: [],
+        
+        POTASSIUM: [],
+        
+        CHLORIDE: [],
+        
+        CALCIUM: [],
+        
+        CO2: [],
+        
+        // Hormones
+        IGF1: [],
+        
+        FASTING_INSULIN: [],
+        
+        // Ketones
+        BETA_HYDROXYBUTYRATE: [],
+        
+        // Vitamins
+        B12: [],
+        
+        Vitamin_D: [],
+        
+        // Minerals
+        MAGNESIUM: [],
+        
+        IRON: [],
+        
+        // Inflammatory Markers
+        CRP: [],
+        
+        // Lipids
+        CHOLESTEROL: [],
+        
+        // Cardiovascular
+        HOMOCYSTEINE: [],
+    };
+
+    const final_key_values = {}
+
+
+    //evaluate input JSON and rank relevant keys
+    for (const key in probable_keys) {
+        //iterate through each page scanned
+        for (const json_page in json_input) {
+            //iterate through each word in the page
+            for (const ocr_word_info of json_page.words) {
+                //evaluate the confidence of the word matching the expected key
+                const confidence = await evalKeyConfidence(ocr_word_info, key);
+                //if confidence is above a threshold, add to probable keys
+                if (confidence > 0.7) {
+                    probable_keys[key].push({
+                        word: ocr_word_info,
+                        keyConfidence: confidence,
+                        page: json_page.imageName,
+                    });
+                }
+            }
+        }
+        probable_keys[key].sort((a, b) => b.keyConfidence - a.keyConfidence);
+        // Keep only top 5
+        if (probable_keys[key].length > 5) {
+            probable_keys[key] = probable_keys[key].slice(0, 5);
+        }
+    }
+
+    //evaluate input JSON and add value confidence to each word
+    for (const json_page in json_input) {
+        //iterate through each word in the page
+        for (const ocr_word_info of json_page.words) {
+            //evaluate the confidence of the word matching the expected key
+            const confidence = await evalValueConfidence(ocr_word_info, key);
+            json_page.words.valueConfidence = confidence;
+        }
+    }
+
+    // Evaluate key-value pairs and their confidence
+    for (const key in probable_keys) {
+        const curConfidence = 0;
+        for (const key_options in probable_keys[key]) {
+            for (const ocr_key in key_options) {
+                const fileName = ocr_key.page
+                const relevantPage = json_input.find(page => page.imageName === fileName);
+                for (const ocr_value of relevantPage.words) {
+                    const confidence = await evaleKeyValueConfidence(ocr_key, ocr_value);
+                    if (confidence > curConfidence) {
+                        curConfidence = confidence;
+                        final_value = ocr_value.word.text; // Assuming the value is in the text property
+                    }
+                }
+            }
+        }
+        final_key_values[key] = final_value
+    }
+
+
+    // Create the final CSV row object
+    const csvRow = { ...curRowFormat };
+    for (const key in final_key_values) {
+        if (final_key_values[key] !== undefined) {
+            csvRow[key] = final_key_values[key];
+        } else {
+            csvRow[key] = null; // or some default value
+        }
+    }
+
+    return csvRow
 }
