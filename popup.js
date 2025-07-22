@@ -1,35 +1,41 @@
 import {processTestImages} from './imageProcessor.js'
-import {filterInputFiles} from './imageCleaner.js'
+import {filterImageFiles} from './imageCleaner.js'
 import {processJsonToCSV} from './formatCsvRow.js'
 
 document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('process-btn-test').addEventListener('click', async () => {
-        console.log('Number of image files found:', files.length);
-        const files = document.getElementById('bloodwork-files').files;
-        const allImages = filterInputFiles(files)
+        try {
+            const files = document.getElementById('bloodwork-files').files;
+            const allImages = await filterImageFiles(files);
+            console.log('Number of image files found:', allImages.length);
+            console.log('Files ready for processing', allImages);
+            const final_data = await processTestImages(allImages);
 
-        console.log('Files ready for processing', allImages);
-        const final_data = await processTestImages(allImages)
-        
-
-        // Convert your JavaScript object or array to a JSON string
-        const json = JSON.stringify(final_data, null, 2); // Pretty print with 2-space indentation
-
-        const csv = processJsonToCSV(json);
-
-        // Create a Blob from the JSON string
-        const blob = new Blob([csv], { type: 'application/csv' });
-
-        // Create a temporary download URL
-        const url = URL.createObjectURL(blob);
-
-        // Create an anchor element to trigger download
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = 'output.csv';
-        a.click();
-
-        // Clean up the URL object to free memory
-        URL.revokeObjectURL(url);
+            // Download raw JSON output
+            const json = JSON.stringify(final_data, null, 2);
+            const json_blob = new Blob([json], { type: 'application/json' });
+            const json_url = URL.createObjectURL(json_blob);
+            const json_a = document.createElement('a');
+            json_a.href = json_url;
+            json_a.download = 'raw_json_output.json';
+            document.body.appendChild(json_a);
+            json_a.click();
+            document.body.removeChild(json_a);
+            URL.revokeObjectURL(json_url);
+            
+            // Download CSV output
+            const csv = await processJsonToCSV(final_data); // Pass the object, not the string
+            const csv_blob = new Blob([csv], { type: 'application/csv' });
+            const csv_url = URL.createObjectURL(csv_blob);
+            const csv_a = document.createElement('a');
+            csv_a.href = csv_url;
+            csv_a.download = 'output.csv';
+            document.body.appendChild(csv_a);
+            csv_a.click();
+            document.body.removeChild(csv_a);
+            URL.revokeObjectURL(csv_url);
+        } catch (err) {
+            console.error('Error during processing:', err);
+        }
     });
 });

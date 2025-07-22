@@ -1,6 +1,11 @@
 import {createScheduler, addWorker, createWorker, PSM} from 'tesseract.js';
 
 export async function processTestImages(files) {    
+
+    if (!files || !files.length) {
+        throw new Error('No images provided to processTestImages.');
+    }
+
     // Create a scheduler and workers
     const workerN = 7;
     const scheduler = createScheduler();
@@ -36,10 +41,10 @@ export async function processTestImages(files) {
                 console.log("blocks have been ensured")
                 out.data.blocks.forEach((block, blockIdx) => {
                     block.paragraphs.forEach((para, paraIdx) => {
-                        const paragraphKey = `block${blockIdx}_paragraph${paraIdx}`;
+                        const paragraphKey = `block_${blockIdx};paragraph_${paraIdx}`;
 
                         para.lines.forEach((line, lineIdx) => {
-                            const lineKey = `${paragraphKey}_line${lineIdx}`;
+                            const lineKey = `${paragraphKey};line_${lineIdx}`;
 
                             line.words.forEach(word => {
                                 wordsArray.push({
