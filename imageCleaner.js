@@ -12,10 +12,19 @@ export async function cleanImage(file) {
 export async function filterImageFiles(files) {
     
     // Separate image and PDF files
-    const imageFiles = Array.from(files).filter(file => file.type.startsWith('image/'));
+    const imageFiles = Array.from(files)
+        .filter(file => file.type.startsWith('image/'));
     const pdfFiles = Array.from(files).filter(file => file.type === 'application/pdf');
 
-    // Convert PDF files to PNG data URLs
+    // Convert PDF files to File objects
+    function canvasToFile(canvas, name) {
+        return new Promise(resolve => {
+            canvas.toBlob(blob => {
+                resolve(new File([blob], name, { type: 'image/png' }));
+            }, 'image/png');
+        });
+    }
+
     const convertedPdfFiles = [];
     for (const pdffile of pdfFiles) {
         try {
@@ -31,32 +40,24 @@ export async function filterImageFiles(files) {
                 canvas.width = viewport.width;
                 canvas.height = viewport.height;
                 await page.render({ canvasContext: context, viewport }).promise;
-                const imageDataUrl = canvas.toDataURL('image/png');
-                convertedPdfFiles.push(imageDataUrl);
+                const uniqueName = `${pdffile.name}_page${pageNum}.png`;
+                const file = await canvasToFile(canvas, uniqueName);
+                convertedPdfFiles.push(file);
             }
         } catch (err) {
             console.error(`Error loading ${pdffile.name}:`, err);
         }
     }
 
-    // Combine all image sources
+    // Combine all image sources as File objects
     const allImages = [...imageFiles, ...convertedPdfFiles];
     if (!Array.isArray(allImages) || allImages.length === 0) {
         throw new Error('No valid images found after filtering.');
     }
 
-    // Convert PNG data URLs to HTMLImageElement, clean all images, and filter out failures
+    // Clean all images and filter out failures
     const processedImages = await Promise.all(
         allImages.map(async image => {
-            if (typeof image === 'string' && image.startsWith('data:image/')) {
-                // Convert data URL to Image object
-                return await new Promise(resolve => {
-                    const img = new Image();
-                    img.onload = () => resolve(img);
-                    img.onerror = () => resolve(undefined);
-                    img.src = image;
-                });
-            }
             // Clean image (async)
             return await cleanImage(image);
         })
