@@ -1,5 +1,5 @@
 // Draws lines between key centers and value centers for each image, returns array of marked-up image Files
-export async function markupImages(original_images, markup_data) {
+export async function markupStructure(original_images, imageKeyValList) {
     // Helper to load image from File/Blob
     function loadImage(file) {
         return new Promise((resolve, reject) => {
@@ -9,8 +9,6 @@ export async function markupImages(original_images, markup_data) {
             img.src = URL.createObjectURL(file);
         });
     }
-
-    console.log(markup_data)
 
     const markedImages = [];
     for (const original_file of original_images) {
@@ -22,60 +20,84 @@ export async function markupImages(original_images, markup_data) {
         const ctx = canvas.getContext('2d');
         ctx.drawImage(img, 0, 0);
 
-        if (markup_data[image_name]) {
-            const keys = markup_data[image_name].keys;
-            for (const key_object of keys) {
-                const key_center = key_object.center_value;
-                if (key_center && typeof key_center.centerx === 'number' && typeof key_center.centery === 'number') {
-                    ctx.beginPath();
-                    ctx.arc(key_center.centerx, key_center.centery, 10, 0, 2 * Math.PI);
-                    ctx.strokeStyle = 'red';
-                    ctx.lineWidth = 3;
-                    ctx.stroke();
-                }
-            }
-            const values = markup_data[image_name].values;
-            for (const value_object of values) {
-                const value_center = value_object.center_value;
-                if (value_center && typeof value_center.centerx === 'number' && typeof value_center.centery === 'number') {
-                    ctx.beginPath();
-                    ctx.arc(value_center.centerx, value_center.centery, 10, 0, 2 * Math.PI);
-                    ctx.strokeStyle = 'blue';
-                    ctx.lineWidth = 3;
-                    ctx.stroke();
-                }
-            }
-
-            // Draw green lines between each key and its 2 closest values
-            for (const key_object of keys) {
-                const key_center = key_object.center_value;
-                if (!key_center || typeof key_center.centerx !== 'number' || typeof key_center.centery !== 'number') continue;
-                // Compute distances to all values
-                const distances = [];
-                for (const value_object of values) {
-                    const value_center = value_object.center_value;
-                    if (!value_center || typeof value_center.centerx !== 'number' || typeof value_center.centery !== 'number') continue;
-                    const dx = key_center.centerx - value_center.centerx;
-                    const dy = key_center.centery - value_center.centery;
-                    const dist = Math.sqrt(dx * dx + dy * dy);
-                    distances.push({ value_center, dist });
-                }
-                // Sort by distance and take 2 closest
-                distances.sort((a, b) => a.dist - b.dist);
-                const closest = distances.slice(0, 2);
-                for (const { value_center } of closest) {
-                    ctx.beginPath();
-                    ctx.moveTo(key_center.centerx, key_center.centery);
-                    ctx.lineTo(value_center.centerx, value_center.centery);
-                    ctx.strokeStyle = 'green';
-                    ctx.lineWidth = 2;
-                    ctx.stroke();
-                }
-            }
-            
-        } else {
+        if (!imageKeyValList[image_name]) {
             console.warn('No markup data for image:', image_name);
         }
+
+        const page_info = imageKeyValList[image_name] 
+
+        //circles keys
+        const keys = page_info.keys;
+        for (const key_object of keys) {
+            ctx.beginPath();
+            ctx.arc(key_object.word_x, key_object.word_y, 10, 0, 2 * Math.PI);
+            ctx.strokeStyle = 'red';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+        }
+        const values = page_info.values;
+        for (const value_object of values) {
+            ctx.beginPath();
+            ctx.arc(value_object.word_x, value_object.word_y, 10, 0, 2 * Math.PI);
+            ctx.strokeStyle = 'blue';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+        }
+
+        // Draw green lines between each key and its 2 closest values
+        for (const key_object of keys) {
+            const keyObjectUniqueKey = key_object.uniqueKey
+            const keyValStruct = page_info.keyValStructPattern
+            const keyFoundInStruct = keyObjectUniqueKey in keyValStruct
+
+            const key_x = key_object.word_x
+            const key_y = key_object.word_y
+
+            // Compute distances to all values
+            const structDistances = [];
+            const regDistances = [];
+            for (const value_object of values) {
+                const valObjectUniqueKey = value_object.uniqueKey
+                if (keyFoundInStruct) {
+                    if (valObjectUniqueKey in keyValStruct[keyObjectUniqueKey]) {
+                        const dx = keyValStruct[keyObjectUniqueKey][valObjectUniqueKey].dx
+                        const dy = keyValStruct[keyObjectUniqueKey][valObjectUniqueKey].dy
+                        const dist = Math.sqrt(dx * dx + dy * dy);
+                        structDistances.push({key_x, key_y, dx, dy, dist});
+                        continue 
+                    } 
+                }
+
+                
+                const dx = value_object.word_x - key_object.word_x;
+                const dy = value_object.word_y - key_object.word_y;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                regDistances.push({key_x, key_y, dx, dy, dist});
+            }
+            // Sort by distance and take 2 closest
+            regDistances.sort((a, b) => a.dist - b.dist);
+            for (const distanceInfo of regDistances.slice(0, 3)) {
+
+                ctx.beginPath();
+                ctx.moveTo(distanceInfo.key_x, distanceInfo.key_y);
+                ctx.lineTo(distanceInfo.key_x + distanceInfo.dx, distanceInfo.key_y + distanceInfo.dy);
+                ctx.strokeStyle = 'yellow';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+            }
+
+            for (const distanceInfo of structDistances) {
+
+                ctx.beginPath();
+                ctx.moveTo(distanceInfo.key_x, distanceInfo.key_y);
+                ctx.lineTo(distanceInfo.key_x + dx, distanceInfo.key_y + dy);
+                ctx.strokeStyle = 'green';
+                ctx.lineWidth = 3;
+                ctx.stroke();
+            }
+        }
+            
+      
 
 
 
@@ -91,7 +113,7 @@ export async function markupImages(original_images, markup_data) {
     return markedImages;
 }
 
-// Process
+// Process that creates a list of marked up images that display the found OCR results in their processed key value map form
 export async function markupOCR(original_images, OCR_word_list) {
     // Helper to load image from File/Blob
     function loadImage(file) {
@@ -103,7 +125,7 @@ export async function markupOCR(original_images, OCR_word_list) {
         });
     }
 
-    console.log(OCR_word_list)
+    
 
     const markedImages = [];
     for (const original_file of original_images) {
@@ -116,35 +138,35 @@ export async function markupOCR(original_images, OCR_word_list) {
         ctx.drawImage(img, 0, 0);
         
         const cur_page_words = OCR_word_list.filter(word_object => image_name === word_object.imageName);
-        console.log(cur_page_words)
+        // console.log(cur_page_words)
         for (const cur_page_word of cur_page_words) {
-            const word_bbox = cur_page_word.word_bbox;
-            if (word_bbox && typeof word_bbox.x0 === 'number' && typeof word_bbox.y0 === 'number' && typeof word_bbox.x1 === 'number' && typeof word_bbox.y1 === 'number') {
-                ctx.beginPath();
-                ctx.rect(word_bbox.x0, word_bbox.y0, word_bbox.x1 - word_bbox.x0, word_bbox.y1 - word_bbox.y0);
+            ctx.beginPath();
+            ctx.rect(cur_page_word.word_x, cur_page_word.word_y, cur_page_word.width, cur_page_word.height);
 
-                if (cur_page_word.potential_keys_for.size > 0) {
-                    ctx.strokeStyle = 'blue';
-                } else if (cur_page_word.number_score > 0.9) {
-                    ctx.strokeStyle = 'red';
-                } else {
-                    ctx.strokeStyle = 'green';
-                }
-
-                ctx.lineWidth = 3;
-                ctx.stroke();
-
-                // Draw the word text at the center
-                const word_center = cur_page_word.center_value;
-                ctx.save();
-                ctx.font = '16px Arial';
-                ctx.fillStyle = 'white';
-                ctx.textAlign = 'center';
-                ctx.textBaseline = 'middle';
-                ctx.fillText(cur_page_word.word_text, word_center.centerx, word_center.centery);
-                ctx.restore();
+            if (cur_page_word.potential_matches.size > 0) {
+                ctx.strokeStyle = 'blue';
+            } else if (cur_page_word.numberScore > 0.9) {
+                ctx.strokeStyle = 'red';
+            } else {
+                ctx.strokeStyle = 'green';
             }
-        }
+
+            ctx.lineWidth = 3;
+            ctx.stroke();
+
+            // Draw the word text at the center
+            ctx.save();
+            ctx.font = '16px Arial';
+            ctx.fillStyle = 'white';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(cur_page_word.word_text, cur_page_word.word_x, cur_page_word.word_y);
+            ctx.restore();
+
+
+
+
+        } 
         
         // Convert canvas to Blob (PNG)
         const markedBlob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
