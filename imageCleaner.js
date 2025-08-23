@@ -7,8 +7,14 @@ export async function cleanImage(file) {
     // This function should handle the image processing and return a cleaned image
     return file; // For now, just return the original file
 }
-
-//filter function for incoming uploaded files
+/**
+ * Filters and processes uploaded files to return only valid image files
+ * Converts PDF pages to images and optionally cleans each image
+ *
+ * @param {File[]} files - Array of uploaded File objects (images and/or PDFs)
+ * @returns {Promise<File[]>} - Promise resolving to an array of processed image File objects
+ * @throws {Error} - Throws if no valid images remain after filtering and processing
+ */
 export async function filterImageFiles(files) {
     
     // Separate image and PDF files

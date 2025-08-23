@@ -208,15 +208,20 @@ export async function testingJsonProcessing( ocr_object_list) {
 }
 
 
-
-//  Processes the input JSON data to extract relevant fields and format them into a CSV row.
-//  Returns an array of objects, each representing a row in the CSV format.
-export async function processJsonToCSV(ocr_object_list) {
-    let probable_keys = {}
-    for (const field of field_names) {
-        const field_name = field.csvfield
-        const field_replacements = field.replacements
-        const field_key_value_pair = evalKeyConfidence(field_name, field_replacements, ocr_object_list)
-        probable_keys[field_key_value_pair.csv_value] = field_key_value_pair.closest_matches
+//
+export async function processToCsv(resultsObject) {
+    let final_csv = {... curRowFormat}
+    for (const [key, value] of Object.entries(final_csv)) {
+        if (value === null) {
+            if (key in resultsObject) {
+                final_csv[key] = resultsObject[key]
+            }
+        }
     }
+    const csv = [
+        Object.keys(obj).join(','),       // header row
+        Object.values(obj).join(',')      // value row
+    ].join('\n');
+    return csv
 }
+
