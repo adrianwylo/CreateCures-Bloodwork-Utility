@@ -1,6 +1,7 @@
 import {processDocumentCollection, processExtractedResults} from './imageProcessor.js'
 import {filterImageFiles} from './imageCleaner.js'
 import {processToCsv} from './formatCsvRow.js'
+import {markupProcessedOcrResults} from './imageMarkup.js'
 
 document.querySelectorAll('input[type="range"]').forEach(slider => {
     const spanId = slider.id + '-value';
@@ -20,6 +21,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const fuseMatchThreshold = parseFloat(document.getElementById('slider-fuse-match-threshold').value);
         const downloadOcrResults = document.getElementById('downloadOCRJson').checked
         const displayOcrResults = document.getElementById('displayOCRJson').checked
+        const displayProcessedResults = document.getElementById('displayProcessedOCR').checked
         const downloadCsv = document.getElementById('downloadCsv').checked
         
         try {
@@ -28,7 +30,8 @@ document.addEventListener('DOMContentLoaded', () => {
             const allImages = await filterImageFiles(files);
             
             //perform Ocr and document info extraction
-            const extractedResults = processDocumentCollection(allImages,
+            const extractedResults = processDocumentCollection(
+                allImages,
                 fuseSearchThreshold,
                 fuseMatchThreshold,
                 downloadOcrResults,
@@ -36,8 +39,11 @@ document.addEventListener('DOMContentLoaded', () => {
             );
 
             //process extracted results
-            const processedResults = processExtractedResults(extractedResults)
-
+            const processedResults = processExtractedResults(extractedResults, displayProcessedResults)
+            if (displayProcessedResults) {
+                const markedImages = await markupProcessedOcrResults(allImages, processedResults.csvFieldAssignments, extractedResults)
+                displayImages(markedImages)
+            }
             
                         
         } catch (err) {

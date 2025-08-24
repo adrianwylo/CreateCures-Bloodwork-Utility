@@ -90,6 +90,85 @@ export async function displayImages(image_list) {
         alert('Popup blocked! Please allow popups for this site to view marked images.');
     }
 }
+
+/**
+ * Generates marked-up images based on OCR results and CSV field assignments.
+ * Draws visual connections between key and value word objects on the same page.
+ * 
+ * Color conventions for visual debugging (can be adjusted in future):
+ *   - Green: key → value links
+ *   - Blue: key words (from OCR) [handled in markupOcrResults]
+ *   - Red: numeric values (from OCR) [handled in markupOcrResults]
+ * 
+ * @param {File[]} originalImages - Array of original image files that were processed.
+ * @param {Object[]} csvFieldAssignments - Array of CSV field assignments containing:
+ *      - keyUniqueKey: string, uniqueKey of the key word object
+ *      - valueUniqueKey: string, uniqueKey of the value word object
+ * @param {Object[]} ocrResults - Array of OCR word objects with metadata, including:
+ *      - uniqueKey: string, unique identifier
+ *      - word_x: number, X coordinate
+ *      - word_y: number, Y coordinate
+ *      - imageName: string, name of the image the word is on
+ *      - matchWeights, currentMatch, etc. (optional metadata for debugging/processing)
+ * @returns {Promise<File[]>} - A promise that resolves to an array of marked-up image files 
+ *                               (PNG format) with visual links drawn between matched key/value pairs.
+ */
+export async function markupProcessedOcrResults(originalImages, csvFieldAssignments, ocrResults) {
+    // Helper to load image from File/Blob
+    function loadImage(file) {
+        return new Promise((resolve, reject) => {
+            const img = new window.Image();
+            img.onload = () => resolve(img);
+            img.onerror = reject;
+            img.src = URL.createObjectURL(file);
+        });
+    }
+    
+    var markedOcrResults = markupOcrResults(originalImages, ocrResults)
+    
+
+    const markedImages = [];
+    for (const original_file of markedOcrResults) {
+        const image_name = original_file.name;
+        const img = await loadImage(original_file);
+        const canvas = document.createElement('canvas');
+        canvas.width = img.width;
+        canvas.height = img.height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0);
+        
+        const csvFieldAssignmentsOnPage = csvFieldAssignments.filter(csvFieldAssignmentInfo => {
+            const keyWordObj = ocrResults.find(obj => obj.uniqueKey === csvFieldAssignmentInfo.keyUniqueKey);
+            if (!keyWordObj) return false; // skip if not found
+            return keyWordObj.imageName === image_name;
+        });
+
+        for (const csvFieldAssignment of csvFieldAssignmentsOnPage) {
+            const keyWordObj = ocrLookup[csvFieldAssignment.keyUniqueKey];
+            const valueWordObj = ocrLookup[csvFieldAssignment.valueUniqueKey];
+            ctx.beginPath();
+            ctx.moveTo(keyWordObj.word_x, keyWordObj.word_y);
+            ctx.lineTo(valueWordObj.word_x, valueWordObj.word_y);
+            ctx.strokeStyle = 'green';
+            ctx.lineWidth = 3;
+            ctx.stroke();
+        }
+
+        // Convert canvas to Blob (PNG)
+        const markedBlob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+        // Optionally, you can create a File with the same name
+        const markedFile = new File([markedBlob], image_name, { type: 'image/png' });
+        markedImages.push(markedFile);
+        // Clean up
+        URL.revokeObjectURL(img.src);
+    }
+    return markedImages;
+}
+
+
+
+
+
 //Ignore below --------------------------------------------------------------------------------
 
 

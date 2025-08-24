@@ -348,7 +348,7 @@ function scoreValOcr(currentOcrResults) {
  *      fuseResults: Object mapping CSV fields to arrays of fuseMatch results
  * }
  * @returns {Object} - {
- *      csvFieldMap: Array<Object>, // Array of mappings for CSV fields
+ *      csvFieldAssignments: Array<Object>, // Array of mappings for CSV fields
  *          Each object has:
  *              csvFieldName: string,  // the CSV field name
  *              keyUniqueKey: string | null,  // uniqueKey of the selected key word object (null if no match)
@@ -461,7 +461,7 @@ export async function processExtractedResults(extractedResults){
 
     //Process csvFieldMap into output of object w/ params as csv field linked to key wordObj and value wordObj
     return {
-        csvFieldMap: csvFieldMap.map(csvFieldInfoObj => ({
+        csvFieldAssignments: csvFieldMap.map(csvFieldInfoObj => ({
             csvFieldName: csvFieldInfoObj.csvField,
             keyUniqueKey: csvFieldInfoObj.currentPair?.selfKey || null,
             valueUniqueKey: csvFieldInfoObj.currentPair?.matchKey || null
