@@ -1,7 +1,3 @@
-
-import Fuse from 'fuse.js';
-
-
 const Default_Row_Format = {
     Date: null,
     Intervention: null,
@@ -141,87 +137,40 @@ export async function modifyRowFormat(field, rangeValue, newValue) {
     }
 }
 
-
-
-export async function testingJsonProcessing( ocr_object_list) {
-    // This function is for debugging purposes to test the JSON processing logic
-
-    //mutates json input with a new property for potential of being a value and a bounding box center point
-    for (var word_object of ocr_object_list){
-        const possible_val = word_object.word_text
-        const val_score = scoreOCRNumber(possible_val)
-        word_object['number_score'] = val_score
-        word_object['center_value'] = {
-            centerx: (word_object.word_bbox.x1 + word_object.word_bbox.x0)/2,
-            centery: (word_object.word_bbox.y1 + word_object.word_bbox.y0)/2,
-        }
-        word_object['potential_keys_for'] = new Set()
-    }
-
-    //finds which ocr values are probably a sought after csv field (will mutate ocr_object_list)
-    let probable_keys = {}
-    for (const field of field_names) {
-        const field_name = field.csvfield
-        const field_replacements = field.replacements
-        const field_key_value_pair = await evalKeyConfidence(field_name, field_replacements, ocr_object_list)
-        probable_keys[field_key_value_pair.csv_value] = field_key_value_pair.closest_matches
-    }
-
-    console.log(ocr_object_list)
-
-    //search for innate structural offset between different probable keys and probable values
-    //isolate each page
-    let image_dic = {}
-    for (var word_object of ocr_object_list) {
-        const page_key = word_object.imageName
-        if (page_key in image_dic) {
-            // Check if key or value and add to appropriate key or value
-            if (word_object.potential_keys_for instanceof Set) {
-                if (word_object.potential_keys_for.size > 0) {
-                    // console.log('Pushing key:', word_object.word_text, 'potential_keys_for:', word_object.potential_keys_for);
-                    image_dic[page_key].keys.push(word_object);
-                    continue;
-                } else {
-                    // Debug: Set is empty
-                    //console.log('Empty potential_keys_for Set for:', word_object.word_text);
-                }
-            } else {
-                // Debug: Not a Set
-                //console.warn('potential_keys_for is not a Set for:', word_object.word_text, word_object.potential_keys_for);
-            }
-            if (word_object.number_score > 0.9) {
-                image_dic[page_key].values.push(word_object);
-                continue;
-            }
-        } else {
-            image_dic[page_key] = {
-                keys: [],
-                values: []
-            };
-        }
-    }
-    console.log(image_dic)
-    return image_dic
-
-
-
-}
-
-
-//
-export async function processToCsv(resultsObject) {
-    let final_csv = {... curRowFormat}
+/**
+ * Processes a results object into a CSV string based on a pre-defined row format.
+ * Fills null fields in the template with values from the results object.
+ * Optionally triggers a download of the CSV file.
+ *
+ * @param {Object} resultsObject - Object containing key-value pairs to populate the CSV.
+ * @param {boolean} downloadCsv - If true, downloads the CSV file automatically.
+ * @returns {Promise<string>} - Promise resolving to a CSV-formatted string.
+ */
+export async function processToCsv(resultsObject, downloadCsv) {
+    const final_csv = { ...curRowFormat };
     for (const [key, value] of Object.entries(final_csv)) {
-        if (value === null) {
-            if (key in resultsObject) {
-                final_csv[key] = resultsObject[key]
-            }
+        if (value === null && key in resultsObject) {
+            final_csv[key] = resultsObject[key];
         }
     }
-    const csv = [
-        Object.keys(obj).join(','),       // header row
-        Object.values(obj).join(',')      // value row
-    ].join('\n');
-    return csv
-}
 
+    // generate CSV
+    const csv = [
+        Object.keys(final_csv).join(','),      // header row
+        Object.values(final_csv).join(',')     // value row
+    ].join('\n');
+
+    if (downloadCsv) {
+        const csv_blob = new Blob([csv], { type: 'text/csv' });
+        const csv_url = URL.createObjectURL(csv_blob);
+        const csv_a = document.createElement('a');
+        csv_a.href = csv_url;
+        csv_a.download = 'final_csv.csv';
+        document.body.appendChild(csv_a);
+        csv_a.click();
+        document.body.removeChild(csv_a);
+        URL.revokeObjectURL(csv_url);
+    }
+
+    return csv;
+}

@@ -32,7 +32,7 @@ export async function markupOcrResults(originalImages, ocrResults) {
             ctx.beginPath();
             ctx.rect(cur_page_word.word_x, cur_page_word.word_y, cur_page_word.width, cur_page_word.height);
 
-            if (cur_page_word.potential_matches.size > 0) {
+            if (cur_page_word.potentialCsvFields.size > 0) {
                 ctx.strokeStyle = 'blue';
             } else if (cur_page_word.numberScore > 0) {
                 ctx.strokeStyle = 'red';
@@ -49,7 +49,7 @@ export async function markupOcrResults(originalImages, ocrResults) {
             ctx.fillStyle = 'white';
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
-            ctx.fillText(cur_page_word.word_text, cur_page_word.word_x, cur_page_word.word_y);
+            ctx.fillText(cur_page_word.wordText, cur_page_word.word_x, cur_page_word.word_y);
             ctx.restore();
         } 
         

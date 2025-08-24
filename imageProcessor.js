@@ -4,12 +4,15 @@ import {field_names} from './formatCsvRow';
 import {markupOcrResults, displayImages} from './imageMarkup';
 
 /**
- * Performs Ocr, cleans results, and evaluates each result's potential of being a sought after value through mutating the potential_matchs and numberScore properties
+ * Performs Ocr, cleans results, and evaluates each result's potential of being a sought after value through mutating the potentialCsvFields and numberScore properties
  *
  * @param {File[]} allImages - Array of image files to be processed.
  * @param {float} fuseThreshold - numerical threshold option for fuzzy searching with fuse.js
  * @param {float} resultThreshold - score threshold for accepting fuse result score
- * @returns {Object[]} Filtered and cleaned array of scored word objects
+ * @returns {Object} - {
+ *      'finalOcrResults': Filtered and cleaned array of scored word objects,
+ *      'fuseResults': Map between csv fields and found matches (Array)
+ * }
  */
 export async function processDocumentCollection(
     allImages, 
@@ -22,18 +25,20 @@ export async function processDocumentCollection(
     // returns ocr_results: Array of word objects extracted from OCR results.
     // Each object represents a single recognized word with metadata:
     // {
-    //   word_text: String        // The recognized word text
-    //   word_confidence: Number  // Confidence score from Tesseract (0–100)
-    //   word_choices: Array      // Alternative recognition choices (empty if none)
+    //   wordText: String        // The recognized word text
+    //   wordConfidence: Number  // Confidence score from Tesseract (0–100)
+    //   wordChoices: Array      // Alternative recognition choices (empty if none)
     //   word_y: Number           // Top Y coordinate of word bounding box
     //   word_x: Number           // Left X coordinate of word bounding box
     //   height: Number           // Height of bounding box
     //   width: Number            // Width of bounding box
-    //   potential_matches: Set   // Placeholder for matching to hardcoded keys
+    //   potentialCsvFields: Set   // Placeholder for matching to hardcoded keys
     //   uniqueKey: String        // Unique hierarchical key (block/para/line/word)
     //   imageName: String        // Name of source image/PDF page
     //   rotateRadians: Number    // Page rotation in radians
     //   numberScore: Number      // Placeholder scoring for numeric parsing
+    //   currentMatch: String     // uniqueKey of the matched item
+    //   matchWeights: Obj        // keys = uniqueKey of match, value = weight of the match
     // }
     let currentOcrResults = await ocrProcessing(allImages);
 
@@ -41,11 +46,11 @@ export async function processDocumentCollection(
     //returns same format as ocrProcessing
     currentOcrResults =  ocrCleaning(currentOcrResults)
     
-    //mutates currentOcrResults to score probability of word_text being a sought after csv value
+    //mutates currentOcrResults to score probability of wordText being a sought after csv value
     //returns an object that maps csv_value to array of 'matched' ocr objects (fuse output form) 
     const fuseResults = scoreKeyOcr(currentOcrResults, field_names, fuseThreshold, resultThreshold)
     
-    //mutates currentOcrResults to score probability of word_text being a sought after numerical value
+    //mutates currentOcrResults to score probability of wordText being a sought after numerical value
     scoreValOcr(currentOcrResults)
     
     //downloads mutated OcrResults
@@ -69,7 +74,10 @@ export async function processDocumentCollection(
         displayImages(markedImages)
     }
 
-    return currentOcrResults
+    return {
+        'finalOcrResults': currentOcrResults,
+        'fuseResults': fuseResults
+    }
 }
 
 /**
@@ -126,24 +134,26 @@ async function ocrProcessing(files) {
                         para.lines.forEach((line, lineIdx) => {
                             const lineKey = `${paragraphKey};l_${lineIdx}`;
                             line.words.forEach((word, wordIdx) => {
-                                var word_choices = word.choices
-                                if (word_choices.length < 2) {
-                                    word_choices = []
+                                var wordChoices = word.choices
+                                if (wordChoices.length < 2) {
+                                    wordChoices = []
                                 }
                                 const uniqueKey = `${lineKey};w_${wordIdx};`
                                 wordsArray.push({
-                                    word_text: word.text,
-                                    word_confidence: word.confidence,
-                                    word_choices: word_choices,
+                                    wordText: word.text,
+                                    wordConfidence: word.confidence,
+                                    wordChoices: wordChoices,
                                     word_y: word.bbox.y0,
                                     word_x: word.bbox.x0,
                                     height: word.bbox.y1 - word.bbox.y0,
                                     width: word.bbox.x1 - word.bbox.x0,
-                                    potential_matches: new Set(),
+                                    potentialCsvFields: new Set(),
                                     uniqueKey: uniqueKey,
                                     imageName: imageName,
                                     rotateRadians: rotateRadians,
-                                    numberScore: 0
+                                    numberScore: 0,
+                                    currentMatch: null,
+                                    matchWeights: {}
                                 });
                             });
                         });
@@ -180,18 +190,18 @@ async function ocrProcessing(files) {
  */
 function ocrCleaning(rawOcrResults) {
     //Removal of low score values
-    let workingOcrResults = rawOcrResults.filter(word => word.word_confidence >= 80);
+    let workingOcrResults = rawOcrResults.filter(word => word.wordConfidence >= 80);
    
-    //Normalize text: convert all word_text to lowercase
+    //Normalize text: convert all wordText to lowercase
     workingOcrResults = workingOcrResults.map(wordObj => ({
         ...wordObj,
-        word_text: wordObj.word_text.toLowerCase()
+        wordText: wordObj.wordText.toLowerCase()
     }));
 
     //Token merging and Splitting TODO
     //for now gets rid of words that are single characters that aren't numbers
     workingOcrResults = rawOcrResults.filter(word => {
-        return word.word_text.length > 1 || /^\d$/.test(word.word_text);
+        return word.wordText.length > 1 || /^\d$/.test(word.wordText);
     });
 
     return workingOcrResults
@@ -199,7 +209,7 @@ function ocrCleaning(rawOcrResults) {
 
 /**
  * Performs fuzzy matching on all words in Ocr word list, finding the best matches per field_name (from ./formatCsvRow)
- * Mutates the matched Ocr word objects' potential_matches property by adding potential matches to each word where search threshold is maintained {
+ * Mutates the matched Ocr word objects' potentialCsvFields property by adding potential matches to each word where search threshold is maintained {
  *      'matched_word': csv field name
         'word_score': fuse score result
  * }
@@ -233,7 +243,7 @@ function scoreKeyOcr(currentOcrResults, field_names, fuseThreshold, resultThresh
             ignoreLocation: true,
             ignoreFieldNorm: true,
             // fieldNormWeight: 1,
-            keys: ["word_text"]
+            keys: ["wordText"]
         };
         const fuse = new Fuse(currentOcrResults, fuseOptions);
         const pure_results = fuse
@@ -245,7 +255,7 @@ function scoreKeyOcr(currentOcrResults, field_names, fuseThreshold, resultThresh
         for (const pure_result of pure_results) {
             matchedOcrObjects.push(pure_result)
             //mutate ocrObject
-            pure_result.item.potential_matches.add({
+            pure_result.item.potentialCsvFields.add({
                 'matched_word': csvFieldName,
                 'word_score': pure_result.score
             })
@@ -265,7 +275,7 @@ function scoreKeyOcr(currentOcrResults, field_names, fuseThreshold, resultThresh
 function scoreValOcr(currentOcrResults) {
     const replacementWeight = 0.2
     const regexWeight = 0.3
-    //replacements are only applicable when word_confidence is between 80 and 90
+    //replacements are only applicable when wordConfidence is between 80 and 90
     const replacements = {
         'o': '0', 'O': '0',
         'I': '1', 'l': '1', 'L': '1',
@@ -278,8 +288,8 @@ function scoreValOcr(currentOcrResults) {
         'T': '7'
     };
     for (var ocrObj of currentOcrResults){
-        let curWordText = ocrObj.word_text;
-        const wordConfidence = ocrObj.word_confidence
+        let curWordText = ocrObj.wordText;
+        const wordConfidence = ocrObj.wordConfidence
             
         //replacement evaluation
         let charReplaceCount = 0
@@ -319,6 +329,176 @@ function scoreValOcr(currentOcrResults) {
         )
     }
 }
+
+
+/**
+ * Processes OCR results and Fuse matches to generate initial key-value pairings
+ * using heuristics and a Gale–Shapley stable matching approach.
+ * This output can be used as an initial state for UI-based human intervention.
+ * 
+ * Key things:
+ * - Only considers high-confidence OCR results (numberScore >= 0.8)
+ * - Keys and values are assumed to be on the same page
+ * - Multiple repeats of keys on a page are handled
+ * - Weights between keys and values are calculated based on positional distance
+ * - Uses Gale–Shapley algorithm to determine stable matches between keys and values
+ * 
+ * @param {Object} extractedResults - {
+ *      finalOcrResults: Array of OCR word objects with scoring and coordinates,
+ *      fuseResults: Object mapping CSV fields to arrays of fuseMatch results
+ * }
+ * @returns {Object} - {
+ *      csvFieldMap: Array<Object>, // Array of mappings for CSV fields
+ *          Each object has:
+ *              csvFieldName: string,  // the CSV field name
+ *              keyUniqueKey: string | null,  // uniqueKey of the selected key word object (null if no match)
+ *              valueUniqueKey: string | null // uniqueKey of the selected value word object (null if no match)
+ *      ocrResultsDebug: Array<Object> // full OCR word objects including internal state like matchWeights and currentMatch
+ * }
+ */
+export async function processExtractedResults(extractedResults){
+    //things to consider keys and values will always be on same page
+    //there can be multiple repeats of keys on a page
+    //there should be a numerical understanding of implausible matches
+    let extractedOcrResults = extractedResults.finalOcrResults
+    const fuseResults = extractedResults.fuseResults
+
+    //organize valueObjects on per page basis
+    let imageValueObjMap = {};
+    for (const wordObj of extractedOcrResults) {
+        if (wordObj.numberScore < 0.8) {
+            continue
+        }
+        const imageName = wordObj.imageName;
+        if (imageValueObjMap.hasOwnProperty(imageName)) {
+            imageValueObjMap[imageName].push(wordObj);
+        } else {
+            imageValueObjMap[imageName] = [wordObj];
+        }
+    }
+    
+    //Iterate through all found csvField matches to evaluate potential value matches (w/ score)
+    //mutates valueWordObjects for Gale Shapely matching
+    let csvFieldMap = []
+    for (const [csvField, fuseMatches] of Object.entries(fuseResults)) {
+        let matchedObjects = []
+        for (const fuseMatch of fuseMatches) {
+            const keyWordObj = fuseMatch.item
+            let valueWordObjPage = imageValueObjMap[keyWordObj.imageName]
+            evaluateKeyValMatch(keyWordObj, valueWordObjPage);
+            matchedObjects.push(keyWordObj.uniqueKey);
+        }
+        csvFieldMap.push({
+            csvField: csvField, //field in question
+            fuseMatchedKeys: matchedObjects, //list of strings of uniquekeys fuse matched w/ csvfield
+            nextProposalIndex: 0, //proposal index
+            preferenceList: [], //list of preferences (prefObjects)
+            currentPair: null //current chosen matching
+        })
+    }
+
+    for (const csvFieldInfoObj of csvFieldMap) { 
+        const wordObjs = extractedOcrResults.filter(wordObj =>
+            csvFieldInfoObj.fuseMatchedKeys.includes(wordObj.uniqueKey)
+        );
+
+        let totalPreferenceList = []
+        for (const wordObj of wordObjs) {
+            for (const [matchUniqueKey, weight] of Object.entries(wordObj.matchWeights)) {
+                const prefObj = {
+                    'matchKey': matchUniqueKey,
+                    'weight': weight,
+                    'selfKey': wordObj.uniqueKey
+                }
+                totalPreferenceList.push(prefObj)
+            }
+        }
+        
+        csvFieldInfoObj.preferenceList = totalPreferenceList
+            .sort((a, b) => a.weight - b.weight)
+        
+    }
+
+
+    //Gale Shapely that only rearranges internal metadata
+    let unmatchedKeys = csvFieldMap.filter(
+        csvFieldInfoObj => csvFieldInfoObj.preferenceList && csvFieldInfoObj.nextProposalIndex < csvFieldInfoObj.preferenceList.length && csvFieldInfoObj.currentPair === null
+    )
+    while (unmatchedKeys.length > 0) {
+        for (const csvFieldInfoObj of unmatchedKeys) {
+            if (csvFieldInfoObj.nextProposalIndex >= csvFieldInfoObj.preferenceList.length) continue;
+
+            const preferenceObj = csvFieldInfoObj.preferenceList[csvFieldInfoObj.nextProposalIndex];
+            csvFieldInfoObj.nextProposalIndex += 1;
+
+            const value = extractedOcrResults.find(v => v.uniqueKey === preferenceObj.matchKey);
+            const key = extractedOcrResults.find(v => v.uniqueKey === preferenceObj.selfKey);
+
+            if (!value.currentMatch) {
+                // value has no current match so pairing
+                key.currentMatch = value.uniqueKey;
+                value.currentMatch = key.uniqueKey;
+                csvFieldInfoObj.currentPair = preferenceObj
+            } else {
+                const newWeight = value.matchWeights[key.uniqueKey];
+                const currentWeight = value.matchWeights[value.currentMatch];
+
+                if (newWeight < currentWeight) {
+                    //better pairing found
+                    const oldKey = extractedOcrResults.find(k => k.uniqueKey === value.currentMatch);
+                    oldKey.currentMatch = null;
+
+                    key.currentMatch = value.uniqueKey;
+                    value.currentMatch = key.uniqueKey;
+                    csvFieldInfoObj.currentPair = preferenceObj
+                }
+            }
+        }
+        unmatchedKeys = csvFieldMap.filter(
+            csvFieldInfoObj => csvFieldInfoObj.preferenceList && csvFieldInfoObj.nextProposalIndex < csvFieldInfoObj.preferenceList.length && csvFieldInfoObj.currentPair === null
+        );
+    }
+
+    //Process csvFieldMap into output of object w/ params as csv field linked to key wordObj and value wordObj
+    return {
+        csvFieldMap: csvFieldMap.map(csvFieldInfoObj => ({
+            csvFieldName: csvFieldInfoObj.csvField,
+            keyUniqueKey: csvFieldInfoObj.currentPair?.selfKey || null,
+            valueUniqueKey: csvFieldInfoObj.currentPair?.matchKey || null
+        })), // the summary of current match state
+        ocrResults: extractedOcrResults // full OCR objects
+    };
+}
+
+/**
+ * Given an keyWordObj that we treat as a csv field, use positional heuristics and evaluate weight of a match between said keyWordObj and all valueWordObj's on the same page
+ * (weight is just distance right now TODO)
+ * 
+ * @param {Object} keyWordObj - word object that needs value matching
+ * @param {Object} wordObjList - list of word objects on the same page that you are searching for
+ * @return {void} - TODO might modify for testing
+ */
+function evaluateKeyValMatch(keyWordObj, valueWordObjList) {
+    //distance helper
+    function distance(a, b) {
+        return Math.sqrt(
+            Math.pow(a.word_x - b.word_x, 2) +
+            Math.pow(a.word_y - b.word_y, 2)
+        );
+    }
+    for (var valueWordObj of valueWordObjList) {
+        const weight = distance(keyWordObj, valueWordObj)
+        //mutate valueword and keyword objects
+        valueWordObj.matchWeights[keyWordObj.uniqueKey] = weight
+        keyWordObj.matchWeights[valueWordObj.uniqueKey] = weight
+    }
+}
+
+
+
+
+
+
 
 //---------------------------------------------------------------------------------------------
 

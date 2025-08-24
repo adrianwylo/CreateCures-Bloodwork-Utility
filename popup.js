@@ -1,4 +1,4 @@
-import {processDocumentCollection} from './imageProcessor.js'
+import {processDocumentCollection, processExtractedResults} from './imageProcessor.js'
 import {filterImageFiles} from './imageCleaner.js'
 import {processToCsv} from './formatCsvRow.js'
 
@@ -21,19 +21,24 @@ document.addEventListener('DOMContentLoaded', () => {
         const downloadOcrResults = document.getElementById('downloadOCRJson').checked
         const displayOcrResults = document.getElementById('displayOCRJson').checked
         const downloadCsv = document.getElementById('downloadCsv').checked
-        const displayKeyValStruct = document.getElementById('displayKeyValueStruct').checked
         
         try {
             //filtering image files
             const files = document.getElementById('bloodwork-files').files;
             const allImages = await filterImageFiles(files);
-
+            
+            //perform Ocr and document info extraction
             const extractedResults = processDocumentCollection(allImages,
                 fuseSearchThreshold,
                 fuseMatchThreshold,
                 downloadOcrResults,
                 displayOcrResults
             );
+
+            //process extracted results
+            const processedResults = processExtractedResults(extractedResults)
+
+            
                         
         } catch (err) {
             console.error('Error during processing:', err);
