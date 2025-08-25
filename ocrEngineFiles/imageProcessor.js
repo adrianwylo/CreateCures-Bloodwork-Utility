@@ -1,6 +1,6 @@
 import {createScheduler, createWorker, PSM} from 'tesseract.js';
 import Fuse from 'fuse.js';
-import {field_names} from './formatCsvRow';
+import {field_names} from '../ocrUiFiles/formatCsvRow';
 import {markupOcrResults, displayImages} from './imageMarkup';
 
 /**
@@ -357,6 +357,7 @@ function scoreValOcr(currentOcrResults) {
  * }
  */
 export async function processExtractedResults(extractedResults){
+    console.log("beginning processing of extracted results")
     //things to consider keys and values will always be on same page
     //there can be multiple repeats of keys on a page
     //there should be a numerical understanding of implausible matches
@@ -458,7 +459,8 @@ export async function processExtractedResults(extractedResults){
             csvFieldInfoObj => csvFieldInfoObj.preferenceList && csvFieldInfoObj.nextProposalIndex < csvFieldInfoObj.preferenceList.length && csvFieldInfoObj.currentPair === null
         );
     }
-
+    console.log("finished processing of extracted results")
+    console.log(csvFieldMap)
     //Process csvFieldMap into output of object w/ params as csv field linked to key wordObj and value wordObj
     return {
         csvFieldAssignments: csvFieldMap.map(csvFieldInfoObj => ({
@@ -498,206 +500,3 @@ function evaluateKeyValMatch(keyWordObj, valueWordObjList) {
 
 
 
-
-
-//---------------------------------------------------------------------------------------------
-
-
-
-
-export async function findOCRDataStruct(ocr_object_list, angleTolerance = 10) {
-    let imageDic = {};
-    for (var wordObj of ocr_object_list) {
-        const pageKey = wordObj.imageName;
-        if (!(pageKey in imageDic)) {
-            imageDic[pageKey] = {
-                words: [],
-                numbers: []
-            };
-        }
-        //check if it is a number
-        if (wordObj.numberScore > 0.8) {
-            imageDic[pageKey].numbers.push(wordObj);
-        } else {
-            imageDic[pageKey].words.push(wordObj);
-        }
-    }
-    //used dictionary to find innate structure
-    for (var pageObj of Object.values(imageDic)) {
-        const words = pageObj.words
-        const numbers = pageObj.numbers
-        //create object that references all distances between word and number
-        let wordDic = {};
-        for (const word of words) {
-            let numberDic = {}
-                for (const number of numbers) {
-                    const dx = number.word_x - word.word_x
-                    const dy = number.word_y - word.word_y
-                    const distance = Math.sqrt(dx * dx + dy * dy);
-                    const angle = Math.atan2(dy, dx) * (180 / Math.PI);
-                    numberDic[number.uniqueKey] = {
-                        dx,
-                        dy,
-                        distance,
-                        angle,
-                        key_x: word.word_x,
-                        key_y: word.word_y
-                    }
-                }
-            wordDic[word.uniqueKey] = numberDic
-        }
-        //create object that organizes above object into reoccuring similar postional offsets
-        let patterns = []
-        for (const [wordkey, numberObj] of Object.entries(wordDic)) {
-            for (const [numberkey, distanceInfo] of Object.entries(numberObj)) {
-                //searching existing patterns for a match
-                var foundSameAngle = false
-                for (var pattern of patterns) {
-                    const newAverageAngle = (pattern.averagedAngle * pattern.count + distanceInfo.angle) / (pattern.count + 1)
-                    const isSameAngle = Math.abs(newAverageAngle - pattern.averagedAngle) <= angleTolerance
-                    if (!isSameAngle) continue;
-                    const horizontalAngle = isHorizontalAngle(distanceInfo.angle)
-                    const verticalAngle = isVerticalAngle(distanceInfo.angle)
-                    const isAxial = horizontalAngle || verticalAngle
-                    const sameWord = wordkey in pattern.keyValueInfo;
-                    
-                    if (sameWord && !isAxial) continue;
-                    if (!sameWord) {
-                        pattern.keyValueInfo[wordkey] = {};
-                    }
-
-                    pattern.keyValueInfo[wordkey][numberkey] = distanceInfo;
-                    pattern.averagedAngle = newAverageAngle;
-                    pattern.count += 1;
-                    foundSameAngle = true
-                    break
-                }
-                if (!foundSameAngle) {
-                    patterns.push({
-                        keyValueInfo: {
-                            [wordkey]: {
-                                [numberkey]: distanceInfo
-                            }
-                        },
-                        averagedAngle: distanceInfo.angle,
-                        count: 1
-                    })
-                }
-            }
-        }
-        pageObj['patterns'] = patterns
-    }
-    return imageDic
-}
-
-
-
-
-//mutates imageKeyValList to include information about keys with structure
-export async function findDataStructPattern(imageKeyValueList) {
-    console.log("running findDataStructPattern")
-    console.log("imageKeyValueList:")
-    console.log(imageKeyValueList)
-    for (var pageObj of Object.values(imageKeyValueList)) {
-        pageObj['keyValStructPattern'] = findPageDataStructPattern(pageObj)
-    }
-}
-
-//identifies if there is a positional pattern between keywords and values by noting distances between each keyword and all values
-//notes if distance/direction is the same and is indicative of a positional data structure
-//also notes keys in relation to each otehr
-
-function findPageDataStructPattern(pageObj, angleTolerance = 5) {
-    console.log("running findPageDataStructPattern")
-    console.log("pageObj: ")
-    console.log(pageObj)
-
-    const keywords = pageObj.keys 
-    const values = pageObj.values
-
-    const keyValueDistances = {};
-
-    for (const key of keywords) {
-        let valueDic = {}
-        for (const value of values) {
-            const dx = value.word_x - key.word_x
-            const dy = value.word_y - key.word_y
-            const distance = Math.sqrt(dx * dx + dy * dy);
-            const angle = Math.atan2(dy, dx) * (180 / Math.PI);
-            valueDic[value.uniqueKey] = {
-                valUniqueKey: value.uniqueKey,
-                dx,
-                dy,
-                distance,
-                angle
-            }
-        }
-        keyValueDistances[key.uniqueKey] = valueDic
-    }
-
-    //
-    let evidenceGroupings = []
-    console.log(`iterating over the following:`)
-    console.log(keyValueDistances)
-    //identifies key and value pairs based on matching angles
-    for (const keyUniqueKey of Object.keys(keyValueDistances)) {
-
-        const valueDic = keyValueDistances[keyUniqueKey]
-        console.log(`nested iterating over the following:`)
-        console.log(valueDic)
-        for (const valueUniqueKey of Object.keys(valueDic)) {
-            const valueInfo = valueDic[valueUniqueKey]
-            //find if there is group match
-            let foundGroup = false
-            for (var grouping of evidenceGroupings) {
-                const newAverageAngle = (grouping.averagedAngle * grouping.count + valueInfo.angle) / (grouping.count + 1)
-                const sameAngle = Math.abs(newAverageAngle - grouping.averagedAngle) <= angleTolerance
-                
-                if (!sameAngle) continue;
-                
-                const horizontalAngle = isHorizontalAngle(valueInfo.angle)
-                const verticalAngle = isVerticalAngle(valueInfo.angle)
-                const isDirectional = horizontalAngle || verticalAngle
-                const exists = keyUniqueKey in grouping.keyValuePairs;
-
-                if (exists && isDirectional) continue;
-
-                if (!exists) {
-                    grouping.keyValuePairs[keyUniqueKey] = [];
-                }
-
-                grouping.keyValuePairs[keyUniqueKey].push(valueInfo);
-                grouping.averagedAngle = newAverageAngle;
-                grouping.count += 1;
-                foundGroup = true
-                break
-            }
-            //create new group if none found
-            if (!foundGroup) {
-                evidenceGroupings.push({
-                    keyValuePairs: {
-                        [keyUniqueKey]: [valueInfo]
-                    },
-                    averagedAngle: valueInfo.angle,
-                    count: 1
-                })
-            }
-
-        }
-    }
-    return evidenceGroupings.filter(grouping => grouping.count > 1)
-}
-
-function isHorizontalAngle(angle, tolerance = 10) {
-    return (
-        Math.abs(angle) <= tolerance ||        // near 0° (right)
-        Math.abs(angle - 180) <= tolerance     // near 180° (left)
-    );
-}
-
-function isVerticalAngle(angle, tolerance = 10) {
-    return (
-        Math.abs(angle - 90) <= tolerance ||   // near 90° (down)
-        Math.abs(angle + 90) <= tolerance      // near -90° (up)
-    );
-}
